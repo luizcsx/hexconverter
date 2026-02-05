@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HexConverter</title>
+    <style>
+        :root {
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --border: #334155;
+            --highlight: rgba(16, 185, 129, 0.2);
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background-color: var(--bg-card);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo { font-weight: 800; color: var(--primary); letter-spacing: 1px; }
+
+        main {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 1rem;
+            padding: 1rem;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 1.2rem;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .tool-box {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        input, button {
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        button {
+            background: var(--primary);
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+        }
+
+        button:hover { background: var(--primary-dark); }
+
+        .editor-container {
+            background: var(--bg-card);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #hexView {
+            flex-grow: 1;
+            padding: 20px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            overflow-y: auto;
+            white-space: pre;
+            color: var(--text-dim);
+        }
+
+        .offset-btn {
+            color: var(--primary);
+            cursor: pointer;
+            text-decoration: underline;
+            font-weight: bold;
+        }
+
+        .offset-btn:hover { color: white; background: var(--primary); }
+
+        .ascii-text { color: var(--primary); }
+        
+@media (max-width: 768px) {
+    main {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+    }
+
+    .sidebar {
+        width: 100%;
+    }
+
+    #hexView {
+        font-size: 11px;
+        padding: 10px;
+        white-space: pre-wrap;
+    }
+
+    header {
+        padding: 1rem;
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+}
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">HEX <span style="color:white">CONVERTER</span></div>
+    <div id="fileInfo" style="font-size: 0.8rem;">Awaiting file...</div>
+</header>
+
+<main>
+    <section class="sidebar">
+        <div class="tool-box">
+            <label>1. Upload file</label>
+            <input type="file" id="loader">
+        </div>
+
+        <div class="tool-box">
+            <label>2. Search by text</label>
+            <input type="text" id="searchBox" placeholder="Enter here.">
+            <button onclick="searchStrings()">LOCATE</button>
+        </div>
+
+        <div class="tool-box" style="margin-top:auto">
+            <button onclick="exportFile()" style="background: #2563eb;">EXPORT FILE</button>
+            <small style="color:var(--text-dim); font-size: 10px; margin-top: 5px;">
+                * Click on the green Offset to edit the text at that point.
+            </small>
+        </div>
+    </section>
+
+    <section class="editor-container">
+        <div id="hexView">Select a file to begin the conversion..</div>
+    </section>
+</main>
+
+<script>
+    let fileData = null;
+
+    document.getElementById('loader').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = function() {
+            fileData = new Uint8Array(reader.result);
+            document.getElementById('fileInfo').innerText = `${file.name.toUpperCase()} | ${fileData.length} BYTES`;
+            renderHex();
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    function renderHex(limit = 1500) {
+        if (!fileData) return;
+        let html = "";
+        for (let i = 0; i < Math.min(fileData.length, limit); i += 16) {
+            let offset = i.toString(16).padStart(8, '0').toUpperCase();
+            let hexPart = "";
+            let asciiPart = "";
+
+            for (let j = 0; j < 16; j++) {
+                if (i + j < fileData.length) {
+                    let b = fileData[i + j];
+                    hexPart += b.toString(16).padStart(2, '0').toUpperCase() + " ";
+                    asciiPart += (b >= 32 && b <= 126) ? String.fromCharCode(b) : ".";
+                }
+            }
+            html += `<span class="offset-btn" onclick="editAt(${i})">${offset}</span>  ${hexPart.padEnd(48)}  <span class="ascii-text">${asciiPart}</span>\n`;
+        }
+        document.getElementById('hexView').innerHTML = html;
+    }
+
+    function editAt(offset) {
+        const currentText = prompt(`Editar texto no offset 0x${offset.toString(16).toUpperCase()}:`);
+        if (currentText) {
+            for (let i = 0; i < currentText.length; i++) {
+                if (offset + i < fileData.length) {
+                    fileData[offset + i] = currentText.charCodeAt(i);
+                }
+            }
+            renderHex();
+        }
+    }
+
+    function searchStrings() {
+        const term = document.getElementById('searchBox').value;
+        if (!term || !fileData) return;
+        
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(term);
+        let results = "Search result:\n\n";
+        
+        for (let i = 0; i < fileData.length - bytes.length; i++) {
+            let match = true;
+            for (let j = 0; j < bytes.length; j++) {
+                if (fileData[i+j] !== bytes[j]) { match = false; break; }
+            }
+            if (match) {
+                results += `> Found in: <span class="offset-btn" onclick="renderNear(${i})">0x${i.toString(16).toUpperCase()}</span>\n`;
+            }
+        }
+        document.getElementById('hexView').innerHTML = results;
+    }
+
+    function renderNear(offset) {
+        renderHex(); 
+        alert("Navegue até o offset: 0x" + offset.toString(16).toUpperCase());
+    }
+
+    function exportFile() {
+        if (!fileData) return;
+        const blob = new Blob([fileData], {type: "application/octet-stream"});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = "output_file.bin";
+        link.click();
+    }
+</script>
+</body>
+</html>
